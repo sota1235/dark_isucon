@@ -143,13 +143,13 @@ $container['helper'] = function ($c) {
                 if ($fetch_comments) {
                     //$post['comment_count'] = $this->fetch_first('SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?', $post['id'])['count'];
                     $post['comment_count'] = $this->cache->get('post_id_'.$post['id']);
-                    $query = 'SELECT * FROM `comments` WHERE `post_id` = ? ORDER BY `created_at` DESC LIMIT 3';
+                    $query = 'SELECT `c`.*, `u`.`account_name` AS `user_account_name` FROM `comments` AS `c` JOIN `users` AS `u` ON `u`.`id` = `c`.`user_id` WHERE `c`.`post_id` = ? ORDER BY `c`.`created_at` DESC LIMIT 3';
 
                     $ps = $this->db()->prepare($query);
                     $ps->execute([$post['id']]);
                     $comments = $ps->fetchAll(PDO::FETCH_ASSOC);
                     foreach ($comments as &$comment) {
-                        $comment['user'] = $this->fetch_first('SELECT * FROM `users` WHERE `id` = ?', $comment['user_id']);
+                        $comment['user'] = [ 'id' => $comment['user_id'], 'account_name' => $comment['user_account_name'] ];
                     }
                     unset($comment);
                     $post['comments'] = array_reverse($comments);
