@@ -1,8 +1,15 @@
 <?php
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
+use \Predis\Client as RedisClient;
 
 require 'vendor/autoload.php';
+
+$redis = new RedisClient([
+	'scheme' => 'tcp', 
+	'host' => '127.0.0.1', 
+	'post' => 6379,
+]);
 
 $_SERVER += ['PATH_INFO' => $_SERVER['REQUEST_URI']];
 $_SERVER['SCRIPT_NAME'] = '/' . basename($_SERVER['SCRIPT_FILENAME']);
