@@ -103,19 +103,15 @@ $container['helper'] = function ($c) {
             $user = $this->fetch_first('SELECT * FROM users WHERE account_name = ? AND del_flg = 0', $account_name);
             if ($user !== false && calculate_passhash($user['account_name'], $password) == $user['passhash']) {
                 return $user;
-            } elseif ($user) {
-                return null;
-            } else {
-                return null;
             }
+            return null;
         }
 
         public function get_session_user() {
             if (isset($_SESSION['user'], $_SESSION['user']['id'])) {
                 return $this->fetch_first('SELECT * FROM `users` WHERE `id` = ?', $_SESSION['user']['id']);
-            } else {
-                return null;
             }
+            return null;
         }
 
         public function make_posts(array $results, $options = []) {
