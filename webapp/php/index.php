@@ -7,7 +7,7 @@ require 'vendor/autoload.php';
 
 $_SERVER += ['PATH_INFO' => $_SERVER['REQUEST_URI']];
 $_SERVER['SCRIPT_NAME'] = '/' . basename($_SERVER['SCRIPT_FILENAME']);
-$file = dirname(__DIR__) . '/public' . $_SERVER['REQUEST_URI'];
+$file = '/home/isucon/private_isu/webapp/public' . $_SERVER['REQUEST_URI'];
 if (is_file($file)) {
     if (PHP_SAPI == 'cli-server') return false;
     $mimetype = [
@@ -26,7 +26,7 @@ const UPLOAD_LIMIT = 10 * 1024 * 1024;
 
 $config = [
     'settings' => [
-        'public_folder' => dirname(dirname(__DIR__)) . '/public',
+        'public_folder' => '/home/isucon/private_isu/webapp/public',
         'db' => [
             'host' => 'localhost',
             'port' => 3306,
@@ -56,7 +56,7 @@ $container['db'] = function ($c) {
 };
 
 $container['view'] = function ($c) {
-    return new class(__DIR__ . '/views/') extends \Slim\Views\PhpRenderer {
+    return new class('/home/isucon/private_isu/webapp/php/views/') extends \Slim\Views\PhpRenderer {
         public function render(\Psr\Http\Message\ResponseInterface $response, $template, array $data = []) {
             $data += ['view' => $template];
             return parent::render($response, 'layout.php', $data);
@@ -176,7 +176,7 @@ $container['helper'] = function ($c) {
 
         public function makeImage($fileNmae, $data)
         {
-            file_put_contents(__DIR__.'/../public/image/'.$fileNmae, $data);
+            file_put_contents('/home/isucon/private_isu/webapp/public/image/'.$fileNmae, $data);
         }
     };
 };
@@ -426,7 +426,7 @@ $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $
     }
 
     // 画像がpublic/imageにあればそちらから取得
-    $fileName = __DIR__.'/../public/image/'.$args['id'].'.'.$args['ext'];
+    $fileName = '/home/isucon/private_isu/webapp/public/image/'.$args['id'].'.'.$args['ext'];
     if (file_exists($fileName)) {
         $imgData = file_get_contents($fileName);
         $fileInfo = new finfo(FILEINFO_MIME_TYPE);
