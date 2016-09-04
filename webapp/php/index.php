@@ -6,9 +6,9 @@ use \Predis\Client as RedisClient;
 require 'vendor/autoload.php';
 
 $redis = new RedisClient([
-	'scheme' => 'tcp', 
-	'host' => '127.0.0.1', 
-	'post' => 6379,
+    'scheme' => 'tcp',
+    'host' => '127.0.0.1',
+    'post' => 6379,
 ]);
 
 $_SERVER += ['PATH_INFO' => $_SERVER['REQUEST_URI']];
@@ -209,7 +209,7 @@ function calculate_passhash($account_name, $password) {
     return digest("{$password}:{$salt}");
 }
 
-// -------- 
+// --------
 
 $app->get('/initialize', function (Request $request, Response $response) {
     $this->get('helper')->db_initialize();
