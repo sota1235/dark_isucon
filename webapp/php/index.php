@@ -412,7 +412,7 @@ $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $
     }
 
     // 画像がpublic/imageにあればそちらから取得
-    $fileName = __DIR__.'/../public/image/'.$args['id'].'.'.$args['ext']);
+    $fileName = __DIR__.'/../public/image/'.$args['id'].'.'.$args['ext'];
     if (file_exists($fileName)) {
         $imgData = file_get_contents($fileName);
         $fileInfo = new finfo(FILEINFO_MIME_TYPE);
