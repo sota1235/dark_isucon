@@ -23,6 +23,9 @@ if (is_file($file)) {
 const POSTS_PER_PAGE = 20;
 const UPLOAD_LIMIT = 10 * 1024 * 1024;
 
+require_once dirname(__FILE__) . '/config.php';
+require_once dirname(__FILE__) . '/Cache.php';
+
 $config = [
     'settings' => [
         'public_folder' => dirname(dirname(__DIR__)) . '/public',
@@ -100,13 +103,26 @@ $container['helper'] = function ($c) {
         }
 
         public function try_login($account_name, $password) {
+            // ユーザをキャッシュする
+            $cache = new Cache();
+            $value = $cache->get('users');
+            if ($value === false)
+            {
+                $value = file_get_contents('./cache/users.txt');
+                $cache->put('users', $value);
+            }
+            $simplexml = simplexml_load_string($value);
+            var_dump($simplexml);
+            exit;
+
             $user = $this->fetch_first('SELECT * FROM users WHERE account_name = ? AND del_flg = 0', $account_name);
             if ($user !== false && calculate_passhash($user['account_name'], $password) == $user['passhash']) {
                 return $user;
             } elseif ($user) {
                 return null;
+            } else {
+                return null;
             }
-            return null;
         }
 
         public function get_session_user() {
