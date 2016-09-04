@@ -417,7 +417,7 @@ $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $
             ->write($image['imgdata']);
     }
 
-    $post = $this->get('helper')->fetch_first('SELECT * FROM `posts` WHERE `id` = ?', $args['id']);
+    $post = $this->get('helper')->fetch_first('SELECT mime, imgdata FROM `posts` WHERE `id` = ?', $args['id']);
 
     $argsExt  = $args['ext'];
     $postMime = $post['mime'];
