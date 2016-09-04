@@ -105,6 +105,15 @@ $container['helper'] = function ($c) {
             foreach($commentCounts as $comment) {
                 $this->cache->set('post_id_'.$comment['post_id'], (int) $comment['comment_count']);
             }
+
+            // ユーザ一覧
+            $users = $db->query('SELECT * FROM `users` WHERE `authority` = 0 AND `del_flg` = 0 ORDER BY `created_at` DESC')->fetchAll();
+            $this->cache->set('admin_banned_users', $users);
+
+            // 記事のページネーションの処理をキャッシュする
+            $full_page = $db->query('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE)->fetchAll();
+            $this->cache->set('posts_per_page_hoge', $full_page);
+
         }
 
         public function fetch_first($query, ...$params) {
@@ -303,10 +312,12 @@ $app->get('/logout', function (Request $request, Response $response) {
 $app->get('/', function (Request $request, Response $response) {
     $me = $this->get('helper')->get_session_user();
 
-    $db = $this->get('db');
-    $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
-    $ps->execute();
-    $results = $ps->fetchAll(PDO::FETCH_ASSOC);
+//   $db = $this->get('db');
+//    $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
+//    $ps->execute();
+//   $results = $ps->fetchAll(PDO::FETCH_ASSOC);
+
+    $results = $this->cache->get('posts_per_page_hoge');
     $posts = $this->get('helper')->make_posts($results);
 
     return $this->view->render($response, 'index.php', ['posts' => $posts, 'me' => $me]);
