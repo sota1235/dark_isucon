@@ -164,6 +164,10 @@ $container['helper'] = function ($c) {
             return $posts;
         }
 
+        public function makeImage($fileNmae, $data)
+        {
+            file_put_contents(__DIR__.'/../public/image/'.$fileNmae, $data);
+        }
     };
 };
 
