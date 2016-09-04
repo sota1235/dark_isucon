@@ -312,16 +312,14 @@ $app->get('/logout', function (Request $request, Response $response) {
 $app->get('/', function (Request $request, Response $response) {
     $me = $this->get('helper')->get_session_user();
 
-    $results = $this->cache->get('posts_per_page_hoge');
+    $results = json_decode($this->cache->get('posts_per_page_hoge'), true);
     if(!$results) {
       $db = $this->get('db');
       $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
       $ps->execute();
       $results = $ps->fetchAll(PDO::FETCH_ASSOC);
-      $this->cache->set('posts_per_page_hoge', $results);
+      $this->cache->set('posts_per_page_hoge', json_encode($results));
     }
-    var_dump($results);
-    exit;
     $posts = $this->get('helper')->make_posts($results);
 
     return $this->view->render($response, 'index.php', ['posts' => $posts, 'me' => $me]);
