@@ -28,11 +28,11 @@ $config = [
     'settings' => [
         'public_folder' => dirname(dirname(__DIR__)) . '/public',
         'db' => [
-            'host' => 'localhost',
-            'port' => 3306,
-            'username' => 'root',
-            'password' => null,
-            'database' => 'isuconp',
+            'host' => $_ENV['ISUCONP_DB_HOST'] ?? 'localhost',
+            'port' => $_ENV['ISUCONP_DB_PORT'] ?? 3306,
+            'username' => $_ENV['ISUCONP_DB_USER'] ?? 'root',
+            'password' => $_ENV['ISUCONP_DB_PASSWORD'] ?? null,
+            'database' => $_ENV['ISUCONP_DB_NAME'] ?? 'isuconp',
         ]
     ]
 ];
@@ -126,7 +126,7 @@ $container['helper'] = function ($c) {
         }
 
         public function try_login($account_name, $password) {
-            $user = $this->fetch_first('SELECT id, account_name, passhash FROM users WHERE account_name = ? AND del_flg = 0', $account_name);
+            $user = $this->fetch_first('SELECT * FROM users WHERE account_name = ? AND del_flg = 0', $account_name);
             if ($user !== false && calculate_passhash($user['account_name'], $password) == $user['passhash']) {
                 return $user;
             } elseif ($user) {
@@ -317,6 +317,8 @@ $app->get('/', function (Request $request, Response $response) {
     $me = $this->get('helper')->get_session_user();
 
     $results = json_decode($this->cache->get('posts_per_page_hoge'), true);
+
+    // キャッシュなければ
     if(!$results) {
       $db = $this->get('db');
       $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
@@ -493,6 +495,7 @@ $app->get('/admin/banned', function (Request $request, Response $response) {
     }
 
     $users = json_decode($this->cache->get('admin_banned_users'), true);
+    // キャッシュなければ
     if(!$users){
         $db = $this->get('db');
         $ps = $db->prepare('SELECT * FROM `users` WHERE `authority` = 0 AND `del_flg` = 0 ORDER BY `created_at` DESC');
@@ -533,22 +536,18 @@ $app->post('/admin/banned', function (Request $request, Response $response) {
 $app->get('/@{account_name}', function (Request $request, Response $response, $args) {
     $db = $this->get('db');
     $user = $this->get('helper')->fetch_first('SELECT * FROM `users` WHERE `account_name` = ? AND `del_flg` = 0', $args['account_name']);
-
     if ($user === false) {
         return $response->withStatus(404)->write('404');
     }
 
-    $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `p`.`user_id` = ? AND `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
-    $ps->execute([$user['id']]);
-    $results = $ps->fetchAll(PDO::FETCH_ASSOC);
+      $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `p`.`user_id` = ? AND `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
+      $ps->execute([$user['id']]);
+      $results = $ps->fetchAll(PDO::FETCH_ASSOC);
     $posts = $this->get('helper')->make_posts($results);
 
     $comment_count = $this->get('helper')->fetch_first('SELECT COUNT(*) AS count FROM `comments` WHERE `user_id` = ?', $user['id'])['count'];
 
-    $ps = $db->prepare('SELECT `id` FROM `posts` WHERE `user_id` = ?');
-    $ps->execute([$user['id']]);
-    $post_ids = array_column($ps->fetchAll(PDO::FETCH_ASSOC), 'id');
-    $post_count = count($post_ids);
+   $post_count = count($posts);
 
     $commented_count = 0;
     if ($post_count > 0) {
