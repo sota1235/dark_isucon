@@ -120,16 +120,13 @@ $container['helper'] = function ($c) {
                 file_put_contents($filePath, $users);
             }
 
-            $users = json_decode($users);
+            $users = json_decode($users,true);
             foreach($users as $user) {
               if ($user['account_name'] === $account_name) {
                 break;
               }
             }
-            var_dump($user);
-            exit;
 
-            $user = $this->fetch_first('SELECT * FROM users WHERE account_name = ? AND del_flg = 0', $account_name);
             if ($user !== false && calculate_passhash($user['account_name'], $password) == $user['passhash']) {
                 return $user;
             }
