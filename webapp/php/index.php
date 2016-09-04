@@ -419,19 +419,23 @@ $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $
 
     $post = $this->get('helper')->fetch_first('SELECT * FROM `posts` WHERE `id` = ?', $args['id']);
 
-    if (($args['ext'] == 'jpg' && $post['mime'] == 'image/jpeg') ||
-        ($args['ext'] == 'png' && $post['mime'] == 'image/png') ||
-        ($args['ext'] == 'gif' && $post['mime'] == 'image/gif')) {
+    $argsExt  = $args['ext'];
+    $postMime = $post['mime'];
+
+    if (($argsExt == 'jpg' && $postMime == 'image/jpeg') ||
+        ($argsExt == 'png' && $postMime == 'image/png') ||
+        ($argsExt == 'gif' && $postMime == 'image/gif')) {
         // キャッシュ作成
         $cacheImg = [
-            'mime'    => $post['mime'],
+            'mime'    => $postMime,
             'imgdata' => $post['imgdata'],
         ];
         $this->cache->set('image_'.$imageId, $cacheImg);
         // レスポンス
-        return $response->withHeader('Content-Type', $post['mime'])
+        return $response->withHeader('Content-Type', $postMime)
                         ->write($post['imgdata']);
     }
+
     return $response->withStatus(404)->write('404');
 });
 
