@@ -1,4 +1,9 @@
 vendor/
+webapp/ruby
+webapp/node
+webapp/golang
+
+
 
 ### Portal
 # Ignore bundler config.
