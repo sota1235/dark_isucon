@@ -107,18 +107,26 @@ $container['helper'] = function ($c) {
             $filePath = './cache/users.json';
             // ファイル内にユーザ情報があればそれを使う
             $users = file_get_contents($filePath);
+            
             // ファイルが無いとき
             if(!$users){
                 $db = $this->db();
                 $ps = $db->prepare('SELECT * FROM users WHERE del_flg = 0');
-		$ps->execute($params);
+		            $ps->execute($params);
                 $value = $ps->fetchAll(PDO::FETCH_ASSOC);
                 $ps->closeCursor();
- // ユーザ情報全ツッコミ
+                // ユーザ情報全ツッコミ
                 $users = json_encode($value);
                 file_put_contents($filePath, $users);
             }
-            var_dump($users);
+
+            $users = json_decode($users);
+            foreach($users as $user) {
+              if ($user['account_name'] === $account_name) {
+                break;
+              }
+            }
+            var_dump($user);
             exit;
 
             $user = $this->fetch_first('SELECT * FROM users WHERE account_name = ? AND del_flg = 0', $account_name);
