@@ -98,8 +98,10 @@ $container['helper'] = function ($c) {
                 $db->query($s);
             }
             // 記事ごとのコメントカウント処理
-            $commentCounts = $db->query('SELECT COUNT(*) FROM comments GROUP BY post_id');
-            $cache->set('comment_counts', $commentCounts);
+            $commentCounts = $db->query('SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id')->fetchAll();
+            foreach($commentCounts as $comment) {
+                $cache->set('post_id_'.$comment['post_id'], (int) $comment['comment_count']);
+            }
         }
 
         public function fetch_first($query, ...$params) {
@@ -404,7 +406,7 @@ $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $
     return $response->withStatus(404)->write('404');
 });
 
-$app->post('/comment', function (Request $request, Response $response) {
+$app->post('/comment', function (Request $request, Response $response) use ($cache) {
     $me = $this->get('helper')->get_session_user();
 
     if ($me === null) {
@@ -429,6 +431,9 @@ $app->post('/comment', function (Request $request, Response $response) {
         $me['id'],
         $params['comment']
     ]);
+
+    // コメント数をインクリメント
+    $cache->incr('post_id_'.$post_id);
 
     return redirect($response, "/posts/{$post_id}", 302);
 });
