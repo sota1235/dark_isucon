@@ -2,6 +2,7 @@
     "require": {
         "slim/slim": "^3.3",
         "slim/php-view": "^2.1",
-        "slim/flash": "^0.1.0"
+        "slim/flash": "^0.1.0",
+        "predis/predis": "^1.1"
     }
 }
