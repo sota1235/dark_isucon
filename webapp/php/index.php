@@ -28,11 +28,11 @@ $config = [
     'settings' => [
         'public_folder' => dirname(dirname(__DIR__)) . '/public',
         'db' => [
-            'host' => $_ENV['ISUCONP_DB_HOST'] ?? 'localhost',
-            'port' => $_ENV['ISUCONP_DB_PORT'] ?? 3306,
-            'username' => $_ENV['ISUCONP_DB_USER'] ?? 'root',
-            'password' => $_ENV['ISUCONP_DB_PASSWORD'] ?? null,
-            'database' => $_ENV['ISUCONP_DB_NAME'] ?? 'isuconp',
+            'host' => 'localhost',
+            'port' => 3306,
+            'username' => 'root',
+            'password' => null,
+            'database' => 'isuconp',
         ]
     ]
 ];
@@ -126,7 +126,7 @@ $container['helper'] = function ($c) {
         }
 
         public function try_login($account_name, $password) {
-            $user = $this->fetch_first('SELECT id, account_name FROM users WHERE account_name = ? AND del_flg = 0', $account_name);
+            $user = $this->fetch_first('SELECT id, account_name, passhash FROM users WHERE account_name = ? AND del_flg = 0', $account_name);
             if ($user !== false && calculate_passhash($user['account_name'], $password) == $user['passhash']) {
                 return $user;
             } elseif ($user) {
