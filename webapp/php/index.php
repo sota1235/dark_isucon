@@ -403,8 +403,18 @@ $app->post('/', function (Request $request, Response $response) {
 });
 
 $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $args) {
-    if ($args['id'] == 0) {
+    $imageId = $args['id'];
+
+    if ($imageId == 0) {
         return '';
+    }
+
+    /** @var Predis\Client */
+    $cach = $this->get('cache');
+
+    if ($image = $cache->get('image_'.id)) {
+        return $response->withHeader('Content-Type', $image['mime'])
+            ->write($image['imgdata']);
     }
 
     $post = $this->get('helper')->fetch_first('SELECT * FROM `posts` WHERE `id` = ?', $args['id']);
@@ -412,6 +422,13 @@ $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $
     if (($args['ext'] == 'jpg' && $post['mime'] == 'image/jpeg') ||
         ($args['ext'] == 'png' && $post['mime'] == 'image/png') ||
         ($args['ext'] == 'gif' && $post['mime'] == 'image/gif')) {
+        // キャッシュ作成
+        $cacheImg = [
+            'mime'    => $post['mime'],
+            'imgdata' => $post['imgdata'],
+        ];
+        $this->cache->set('image_'.$imageId, $cacheImg);
+        // レスポンス
         return $response->withHeader('Content-Type', $post['mime'])
                         ->write($post['imgdata']);
     }
