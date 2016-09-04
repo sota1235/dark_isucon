@@ -1,6 +1,7 @@
 <?php
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
+use \Predis\Client as RedisClient;
 
 require 'vendor/autoload.php';
 
@@ -66,6 +67,15 @@ $container['view'] = function ($c) {
     };
 };
 
+$container['cache'] = function () {
+    /** @var RedisClient */
+    return new RedisClient([
+        'scheme' => 'tcp',
+        'host' => '127.0.0.1',
+        'post' => 6379,
+    ]);
+};
+
 $container['flash'] = function () {
     return new \Slim\Flash\Messages;
 };
@@ -74,6 +84,7 @@ $container['helper'] = function ($c) {
     return new class($c) {
         public function __construct($c) {
             $this->db = $c['db'];
+            $this->cache = $c['cache'];
         }
 
         public function db() {
@@ -81,6 +92,7 @@ $container['helper'] = function ($c) {
         }
 
         public function db_initialize() {
+            $this->cache->flushall(); // キャッシュをflush
             $db = $this->db();
             $sql = [];
             $sql[] = 'DELETE FROM users WHERE id > 1000';
@@ -90,6 +102,11 @@ $container['helper'] = function ($c) {
             $sql[] = 'UPDATE users SET del_flg = 1 WHERE id % 50 = 0';
             foreach($sql as $s) {
                 $db->query($s);
+            }
+            // 記事ごとのコメントカウント処理
+            $commentCounts = $db->query('SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id')->fetchAll();
+            foreach($commentCounts as $comment) {
+                $this->cache->set('post_id_'.$comment['post_id'], (int) $comment['comment_count']);
             }
         }
 
@@ -141,33 +158,30 @@ $container['helper'] = function ($c) {
         }
 
         public function make_posts(array $results, $options = []) {
-            $options += ['all_comments' => false];
-            $all_comments = $options['all_comments'];
+            $fetch_comments = isset($options['comments']) ? $options['comments'] : true;
 
             $posts = [];
             foreach ($results as $post) {
-                $post['comment_count'] = $this->fetch_first('SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?', $post['id'])['count'];
-                $query = 'SELECT * FROM `comments` WHERE `post_id` = ? ORDER BY `created_at` DESC';
-                if (!$all_comments) {
-                    $query .= ' LIMIT 3';
+                if ($fetch_comments) {
+                    //$post['comment_count'] = $this->fetch_first('SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?', $post['id'])['count'];
+                    $post['comment_count'] = $this->cache->get('post_id_'.$post['id']);
+                    $query = 'SELECT `c`.*, `u`.`account_name` AS `user_account_name` FROM `comments` AS `c` JOIN `users` AS `u` ON `u`.`id` = `c`.`user_id` WHERE `c`.`post_id` = ? ORDER BY `c`.`created_at` DESC LIMIT 3';
+
+                    $ps = $this->db()->prepare($query);
+                    $ps->execute([$post['id']]);
+                    $comments = $ps->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($comments as &$comment) {
+                        $comment['user'] = [ 'id' => $comment['user_id'], 'account_name' => $comment['user_account_name'] ];
+                    }
+                    unset($comment);
+                    $post['comments'] = array_reverse($comments);
                 }
 
-                $ps = $this->db()->prepare($query);
-                $ps->execute([$post['id']]);
-                $comments = $ps->fetchAll(PDO::FETCH_ASSOC);
-                foreach ($comments as &$comment) {
-                    $comment['user'] = $this->fetch_first('SELECT * FROM `users` WHERE `id` = ?', $comment['user_id']);
-                }
-                unset($comment);
-                $post['comments'] = array_reverse($comments);
-
-                $post['user'] = $this->fetch_first('SELECT * FROM `users` WHERE `id` = ?', $post['user_id']);
-                if ($post['user']['del_flg'] == 0) {
-                    $posts[] = $post;
-                }
-                if (count($posts) >= POSTS_PER_PAGE) {
-                    break;
-                }
+                $post['user'] = [
+                    'id' => $post['user_id'],
+                    'account_name' => $post['user_account_name'],
+                ];
+                $posts[] = $post;
             }
             return $posts;
         }
@@ -224,7 +238,7 @@ function calculate_passhash($account_name, $password) {
     return digest("{$password}:{$salt}");
 }
 
-// -------- 
+// --------
 
 $app->get('/initialize', function (Request $request, Response $response) {
     $this->get('helper')->db_initialize();
@@ -312,7 +326,7 @@ $app->get('/', function (Request $request, Response $response) {
     $me = $this->get('helper')->get_session_user();
 
     $db = $this->get('db');
-    $ps = $db->prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` ORDER BY `created_at` DESC');
+    $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
     $ps->execute();
     $results = $ps->fetchAll(PDO::FETCH_ASSOC);
     $posts = $this->get('helper')->make_posts($results);
@@ -324,7 +338,7 @@ $app->get('/posts', function (Request $request, Response $response) {
     $params = $request->getParams();
     $max_created_at = $params['max_created_at'] ?? null;
     $db = $this->get('db');
-    $ps = $db->prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `created_at` <= ? ORDER BY `created_at` DESC');
+    $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `p`.`body`, `p`.`mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `p`.`created_at` <= ? AND `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
     $ps->execute([$max_created_at === null ? null : $max_created_at]);
     $results = $ps->fetchAll(PDO::FETCH_ASSOC);
     $posts = $this->get('helper')->make_posts($results);
@@ -334,16 +348,28 @@ $app->get('/posts', function (Request $request, Response $response) {
 
 $app->get('/posts/{id}', function (Request $request, Response $response, $args) {
     $db = $this->get('db');
-    $ps = $db->prepare('SELECT * FROM `posts` WHERE `id` = ?');
+    $ps = $db->prepare('SELECT `p`.*, `u`.`account_name` AS `user_account_name` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `p`.`id` = ? AND `u`.`del_flg` = 0');
     $ps->execute([$args['id']]);
     $results = $ps->fetchAll(PDO::FETCH_ASSOC);
-    $posts = $this->get('helper')->make_posts($results, ['all_comments' => true]);
+    $posts = $this->get('helper')->make_posts($results, ['comments' => false]);
 
     if (count($posts) == 0) {
         return $response->withStatus(404)->write('404');
     }
 
     $post = $posts[0];
+
+    $query = 'SELECT `c`.*, `u`.`account_name` AS `user_account_name` FROM `comments` AS `c` JOIN `users` AS `u` ON `u`.`id` = `c`.`user_id` WHERE `c`.`post_id` = ? ORDER BY `c`.`created_at` DESC';
+
+    $ps = $db->prepare($query);
+    $ps->execute([$post['id']]);
+    $comments = $ps->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($comments as &$comment) {
+        $comment['user'] = [ 'id' => $comment['user_id'], 'account_name' => $comment['user_account_name'] ];
+    }
+    unset($comment);
+    $post['comments'] = array_reverse($comments);
+    $post['comment_count'] = count($comments);
 
     $me = $this->get('helper')->get_session_user();
 
@@ -416,6 +442,7 @@ $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $
 
 $app->post('/comment', function (Request $request, Response $response) {
     $me = $this->get('helper')->get_session_user();
+    $cache = $this->get('cache');
 
     if ($me === null) {
         return redirect($response, '/login', 302);
@@ -439,6 +466,9 @@ $app->post('/comment', function (Request $request, Response $response) {
         $me['id'],
         $params['comment']
     ]);
+
+    // コメント数をインクリメント
+    $cache->incr('post_id_'.$post_id);
 
     return redirect($response, "/posts/{$post_id}", 302);
 });
@@ -496,7 +526,7 @@ $app->get('/@{account_name}', function (Request $request, Response $response, $a
         return $response->withStatus(404)->write('404');
     }
 
-    $ps = $db->prepare('SELECT `id`, `user_id`, `body`, `created_at`, `mime` FROM `posts` WHERE `user_id` = ? ORDER BY `created_at` DESC');
+    $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `p`.`user_id` = ? AND `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
     $ps->execute([$user['id']]);
     $results = $ps->fetchAll(PDO::FETCH_ASSOC);
     $posts = $this->get('helper')->make_posts($results);
