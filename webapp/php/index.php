@@ -318,6 +318,7 @@ $app->get('/', function (Request $request, Response $response) {
       $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
       $ps->execute();
       $results = $ps->fetchAll(PDO::FETCH_ASSOC);
+      $this->cache->set('posts_per_page_hoge', $results);
     }
     var_dump($results);
     exit;
