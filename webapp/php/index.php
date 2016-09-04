@@ -5,7 +5,8 @@ use \Predis\Client as RedisClient;
 
 require 'vendor/autoload.php';
 
-$redis = new RedisClient([
+/** @var RedisClient */
+$cache = new RedisClient([
     'scheme' => 'tcp',
     'host' => '127.0.0.1',
     'post' => 6379,
@@ -85,6 +86,7 @@ $container['helper'] = function ($c) {
         }
 
         public function db_initialize() {
+            $cache->flushall(); // キャッシュをflush
             $db = $this->db();
             $sql = [];
             $sql[] = 'DELETE FROM users WHERE id > 1000';
@@ -95,6 +97,9 @@ $container['helper'] = function ($c) {
             foreach($sql as $s) {
                 $db->query($s);
             }
+            // 記事ごとのコメントカウント処理
+            $commentCounts = $db->query('SELECT COUNT(*) FROM comments GROUP BY post_id');
+            $cache->set('comment_counts', $commentCounts);
         }
 
         public function fetch_first($query, ...$params) {
