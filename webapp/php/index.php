@@ -150,7 +150,6 @@ $container['helper'] = function ($c) {
             $posts = [];
             foreach ($results as $post) {
                 if ($fetch_comments) {
-                    //$post['comment_count'] = $this->fetch_first('SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?', $post['id'])['count'];
                     $post['comment_count'] = $this->cache->get('post_id_'.$post['id']);
                     $query = 'SELECT `c`.*, `u`.`account_name` AS `user_account_name` FROM `comments` AS `c` JOIN `users` AS `u` ON `u`.`id` = `c`.`user_id` WHERE `c`.`post_id` = ? ORDER BY `c`.`created_at` DESC LIMIT 3';
 
