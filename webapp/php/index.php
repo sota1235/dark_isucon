@@ -103,16 +103,18 @@ $container['helper'] = function ($c) {
         }
 
         public function try_login($account_name, $password) {
-            // ユーザをキャッシュする
-            $cache = new Cache();
-            $value = $cache->get('users');
-            if ($value === false)
-            {
-                $value = file_get_contents('./cache/users.txt');
-                $cache->put('users', $value);
+
+            $filePath = './cache/users.json';
+            // ファイル内にユーザ情報があればそれを使う
+            $users = file_get_contents($filePath);
+            // ファイルが無いとき
+            if( $users === false ){
+              // ユーザ情報全ツッコミ
+                $value = $this->fetch_first('SELECT * FROM users AND del_flg = 0');
+                $users = json_decode($value);
+                file_put_contents($filePath, $users);
             }
-            $simplexml = simplexml_load_string($value);
-            var_dump($simplexml);
+            var_dump($users);
             exit;
 
             $user = $this->fetch_first('SELECT * FROM users WHERE account_name = ? AND del_flg = 0', $account_name);
