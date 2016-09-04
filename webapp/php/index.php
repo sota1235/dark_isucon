@@ -535,7 +535,18 @@ $app->post('/admin/banned', function (Request $request, Response $response) {
 
 $app->get('/@{account_name}', function (Request $request, Response $response, $args) {
     $db = $this->get('db');
-    $user = $this->get('helper')->fetch_first('SELECT * FROM `users` WHERE `account_name` = ? AND `del_flg` = 0', $args['account_name']);
+    // userキャッシュ
+    $users = json_decode($this->cache->get('admin_banned_users'), true);
+    if ($users) {
+        $user = $this->get('helper')->fetch_first('SELECT * FROM `users` WHERE `account_name` = ? AND `del_flg` = 0', $args['account_name']);
+    } else {
+        foreach($users as $user) {
+          if($user[account_name] == $args['account_name']) {
+            break;
+          }
+        }
+        $user = false;
+    }
 
     if ($user === false) {
         return $response->withStatus(404)->write('404');
