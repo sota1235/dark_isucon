@@ -114,6 +114,12 @@ $container['helper'] = function ($c) {
             $full_page = $db->query('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE)->fetchAll();
             $this->cache->set('posts_per_page_hoge', json_encode($full_page));
 
+            // ユーザごとのページをキャッシュ
+            foreach($users as $user) {
+                $user_posts = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `p`.`user_id` = ? AND `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE)->execute([$user['id']])->fetchAll();
+                $this->cache->set('user_post_'.$user['id'], json_encode($user_posts));
+            }
+
         }
 
         public function fetch_first($query, ...$params) {
@@ -540,9 +546,16 @@ $app->get('/@{account_name}', function (Request $request, Response $response, $a
         return $response->withStatus(404)->write('404');
     }
 
-      $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `p`.`user_id` = ? AND `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
-      $ps->execute([$user['id']]);
-      $results = $ps->fetchAll(PDO::FETCH_ASSOC);
+    $results = json_decode($this->cache->get('user_post_'.$user['id']), true);
+
+    // キャッシュがなかったら
+    if (!$results) {
+        $ps = $db->prepare('SELECT `p`.`id`, `p`.`user_id`, `u`.`account_name` AS `user_account_name`, `body`, `mime`, `p`.`created_at` FROM `posts` AS `p` JOIN `users` AS `u` ON `u`.`id` = `p`.`user_id` WHERE `p`.`user_id` = ? AND `u`.`del_flg` = 0 ORDER BY `p`.`created_at` DESC LIMIT ' . POSTS_PER_PAGE);
+        $ps->execute([$user['id']]);
+        $results = $ps->fetchAll(PDO::FETCH_ASSOC);
+        $this->cache->set('user_post_'.$user['id'], json_encode($results));
+    }
+
     $posts = $this->get('helper')->make_posts($results);
 
     $comment_count = $this->get('helper')->fetch_first('SELECT COUNT(*) AS count FROM `comments` WHERE `user_id` = ?', $user['id'])['count'];
