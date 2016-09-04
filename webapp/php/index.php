@@ -109,8 +109,11 @@ $container['helper'] = function ($c) {
             $users = file_get_contents($filePath);
             // ファイルが無いとき
             if( $users === false ){
-              // ユーザ情報全ツッコミ
-                $value = $this->fetch_first('SELECT * FROM users AND del_flg = 0');
+                $db = $this->db();
+                $ps = $db->prepare('SELECT * FROM users WHERE del_flg = 0');
+                $value = $ps->fetchAll(PDO::FETCH_ASSOC);
+                $ps->closeCursor();
+ // ユーザ情報全ツッコミ
                 $users = json_decode($value);
                 file_put_contents($filePath, $users);
             }
