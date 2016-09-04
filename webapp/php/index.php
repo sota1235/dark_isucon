@@ -108,13 +108,14 @@ $container['helper'] = function ($c) {
             // ファイル内にユーザ情報があればそれを使う
             $users = file_get_contents($filePath);
             // ファイルが無いとき
-            if( $users === false ){
+            if(!$users){
                 $db = $this->db();
                 $ps = $db->prepare('SELECT * FROM users WHERE del_flg = 0');
+		$ps->execute($params);
                 $value = $ps->fetchAll(PDO::FETCH_ASSOC);
                 $ps->closeCursor();
  // ユーザ情報全ツッコミ
-                $users = json_decode($value);
+                $users = json_encode($value);
                 file_put_contents($filePath, $users);
             }
             var_dump($users);
