@@ -91,12 +91,13 @@ $container['helper'] = function ($c) {
         public function db_initialize() {
             $this->cache->flushall(); // キャッシュをflush
             $db = $this->db();
-            $sql = [];
-            $sql[] = 'DELETE FROM users WHERE id > 1000';
-            $sql[] = 'DELETE FROM posts WHERE id > 10000';
-            $sql[] = 'DELETE FROM comments WHERE id > 100000';
-            $sql[] = 'UPDATE users SET del_flg = 0';
-            $sql[] = 'UPDATE users SET del_flg = 1 WHERE id % 50 = 0';
+            $sql = [
+                'DELETE FROM users WHERE id > 1000',
+                'DELETE FROM posts WHERE id > 10000',
+                'DELETE FROM comments WHERE id > 100000',
+                'UPDATE users SET del_flg = 0',
+                'UPDATE users SET del_flg = 1 WHERE id % 50 = 0',
+            ];
             foreach($sql as $s) {
                 $db->query($s);
             }
