@@ -5,13 +5,6 @@ use \Predis\Client as RedisClient;
 
 require 'vendor/autoload.php';
 
-/** @var RedisClient */
-$cache = new RedisClient([
-    'scheme' => 'tcp',
-    'host' => '127.0.0.1',
-    'post' => 6379,
-]);
-
 $_SERVER += ['PATH_INFO' => $_SERVER['REQUEST_URI']];
 $_SERVER['SCRIPT_NAME'] = '/' . basename($_SERVER['SCRIPT_FILENAME']);
 $file = dirname(__DIR__) . '/public' . $_SERVER['REQUEST_URI'];
@@ -71,6 +64,15 @@ $container['view'] = function ($c) {
     };
 };
 
+$container['cache'] = function () {
+    /** @var RedisClient */
+    return new RedisClient([
+        'scheme' => 'tcp',
+        'host' => '127.0.0.1',
+        'post' => 6379,
+    ]);
+};
+
 $container['flash'] = function () {
     return new \Slim\Flash\Messages;
 };
@@ -79,6 +81,7 @@ $container['helper'] = function ($c) {
     return new class($c) {
         public function __construct($c) {
             $this->db = $c['db'];
+            $this->cache = $c['cache'];
         }
 
         public function db() {
@@ -86,7 +89,7 @@ $container['helper'] = function ($c) {
         }
 
         public function db_initialize() {
-            $cache->flushall(); // キャッシュをflush
+            $this->cache->flushall(); // キャッシュをflush
             $db = $this->db();
             $sql = [];
             $sql[] = 'DELETE FROM users WHERE id > 1000';
@@ -100,7 +103,7 @@ $container['helper'] = function ($c) {
             // 記事ごとのコメントカウント処理
             $commentCounts = $db->query('SELECT post_id, COUNT(*) AS comment_count FROM comments GROUP BY post_id')->fetchAll();
             foreach($commentCounts as $comment) {
-                $cache->set('post_id_'.$comment['post_id'], (int) $comment['comment_count']);
+                $this->cache->set('post_id_'.$comment['post_id'], (int) $comment['comment_count']);
             }
         }
 
@@ -139,7 +142,7 @@ $container['helper'] = function ($c) {
             $posts = [];
             foreach ($results as $post) {
                 // $post['comment_count'] = $this->fetch_first('SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?', $post['id'])['count'];
-                $post['comment_count'] = $cache->get('post_id_'.$post['id']);
+                $post['comment_count'] = $this->cache->get('post_id_'.$post['id']);
                 $query = 'SELECT * FROM `comments` WHERE `post_id` = ? ORDER BY `created_at` DESC';
                 if (!$all_comments) {
                     $query .= ' LIMIT 3';
@@ -407,8 +410,9 @@ $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $
     return $response->withStatus(404)->write('404');
 });
 
-$app->post('/comment', function (Request $request, Response $response) use ($cache) {
+$app->post('/comment', function (Request $request, Response $response) {
     $me = $this->get('helper')->get_session_user();
+    $cache = $this->get('cache');
 
     if ($me === null) {
         return redirect($response, '/login', 302);
