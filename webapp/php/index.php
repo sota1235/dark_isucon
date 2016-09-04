@@ -411,11 +411,24 @@ $app->get('/image/{id}.{ext}', function (Request $request, Response $response, $
         return '';
     }
 
+    // 画像がpublic/imageにあればそちらから取得
+    $fileName = __DIR__.'/../public/image/'.$args['id'].'.'.$args['ext']);
+    if (file_exists($fileName)) {
+        $imgData = file_get_contents($fileName);
+        $fileInfo = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $fileInfo->buffer($imgData);
+        return $response->withHeader('Content-Type', $mimeType)
+            ->write($imgData);
+
+    }
+
     $post = $this->get('helper')->fetch_first('SELECT * FROM `posts` WHERE `id` = ?', $args['id']);
 
     if (($args['ext'] == 'jpg' && $post['mime'] == 'image/jpeg') ||
         ($args['ext'] == 'png' && $post['mime'] == 'image/png') ||
         ($args['ext'] == 'gif' && $post['mime'] == 'image/gif')) {
+        // 画像をpublic/imageに保存
+        $this->get('helper')->makeImage($args['id'].'.'.$args['ext'], $post['imgdata']);
         return $response->withHeader('Content-Type', $post['mime'])
                         ->write($post['imgdata']);
     }
