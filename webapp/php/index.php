@@ -106,6 +106,13 @@ $container['helper'] = function ($c) {
                 $this->cache->set('post_id_'.$comment['post_id'], (int) $comment['comment_count']);
             }
 
+            // ユーザごとのコメントカウント処理
+            $userCommentCounts = $db->query('SELECT user_id, COUNT(*) AS comment_count FROM comments GROUP BY user_id')->fetchAll();
+            foreach($userCommentCounts as $comment) {
+                $this->cache->set('user_id_'.$comment['user_id'], (int) $comment['comment_count']);
+            }
+
+
             // ユーザ一覧
             $users = $db->query('SELECT * FROM `users` WHERE `authority` = 0 AND `del_flg` = 0 ORDER BY `created_at` DESC')->fetchAll();
             $this->cache->set('admin_banned_users', json_encode($users));
@@ -476,6 +483,7 @@ $app->post('/comment', function (Request $request, Response $response) {
 
     // コメント数をインクリメント
     $cache->incr('post_id_'.$post_id);
+    $cache->incr('user_id_'.$me['id']);
 
     return redirect($response, "/posts/{$post_id}", 302);
 });
@@ -542,7 +550,7 @@ $app->get('/@{account_name}', function (Request $request, Response $response, $a
     $results = $ps->fetchAll(PDO::FETCH_ASSOC);
     $posts = $this->get('helper')->make_posts($results);
 
-    $comment_count = $this->get('helper')->fetch_first('SELECT COUNT(*) AS count FROM `comments` WHERE `user_id` = ?', $user['id'])['count'];
+    $comment_count = $this->get('cache')->get('user_id_'.$user['id']);
 
     $ps = $db->prepare('SELECT `id` FROM `posts` WHERE `user_id` = ?');
     $ps->execute([$user['id']]);
